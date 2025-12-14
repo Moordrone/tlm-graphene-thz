@@ -1,0 +1,141 @@
+# Theoretical Background
+
+## 1. Transmission Line Matrix (TLM) Method
+
+The TLM method is a time-domain numerical technique for solving Maxwell's equations. It discretizes space into a network of transmission lines, where voltage pulses propagate and scatter at nodes.
+
+### Basic Principles
+
+1. **Discretization**: Space is divided into cells of size Î”l
+2. **Time stepping**: Each time step Î”t = Î”l/c (CFL condition)
+3. **Scattering**: At each node, incident pulses scatter to produce reflected pulses
+4. **Connection**: Scattered pulses propagate to adjacent nodes
+
+### 1D TLM Equations
+
+For a shunt node with characteristic impedance Zâ‚€:
+
+**Scattering matrix:**
+```
+V_r = S Ã— V_i
+```
+
+where S is the scattering matrix.
+
+**Connection:**
+```
+V_left^{n+1}(i) = V_right^n(i+1)
+V_right^{n+1}(i) = V_left^n(i-1)
+```
+
+## 2. Graphene Conductivity
+
+### Drude Model (Intraband)
+
+The Drude model describes graphene conductivity from intraband transitions:
+
+$$\sigma_{intra}(\omega) = \frac{e^2 E_F}{\pi \hbar^2} \cdot \frac{i}{\omega + i\gamma}$$
+
+where:
+- $E_F$ = Fermi energy
+- $\gamma = 1/\tau$ = scattering rate
+- $\tau$ = relaxation time
+
+### Physical Parameters
+
+| Parameter | Typical Range | Description |
+|-----------|---------------|-------------|
+| E_F | 0.1 - 1.0 eV | Controllable via gating |
+| Ï„ | 10 - 1000 fs | Depends on sample quality |
+| T | 300 K | Temperature |
+
+### DC Conductivity
+
+At zero frequency (Ï‰ â†’ 0):
+
+$$\sigma_{DC} = \frac{e^2 E_F \tau}{\pi \hbar^2}$$
+
+### Plasma Frequency
+
+The characteristic frequency where graphene transitions from metallic to dielectric behavior:
+
+$$\omega_p = \sqrt{\frac{e^2 E_F}{\pi \hbar^2 \tau}}$$
+
+## 3. Optical Response of Graphene Sheet
+
+### Fresnel Coefficients
+
+For a thin conductive sheet at normal incidence between two media with the same impedance:
+
+**Reflection coefficient:**
+$$r = \frac{-\sigma Z_0}{2 + \sigma Z_0}$$
+
+**Transmission coefficient:**
+$$t = \frac{2}{2 + \sigma Z_0}$$
+
+where $Z_0 = 376.73 \Omega$ is the free-space impedance.
+
+### Power Coefficients
+
+$$R = |r|^2, \quad T = |t|^2, \quad A = 1 - R - T$$
+
+### Maximum Absorption
+
+For a symmetric structure (air-graphene-air), maximum absorption is achieved when:
+
+$$\text{Re}(\sigma) = \frac{2}{Z_0} \approx 5.3 \text{ mS}$$
+
+This gives $A_{max} = 50\%$ (half of incident power).
+
+## 4. TLM Implementation for Graphene
+
+### Resistive Boundary Condition
+
+The graphene sheet is modeled as a resistive boundary at a specific node. The scattering at this node includes the graphene surface impedance:
+
+$$Z_s = \frac{1}{\sigma(\omega)}$$
+
+### Frequency Domain Analysis
+
+1. **Excitation**: Broadband Gaussian pulse
+2. **Propagation**: Run TLM for sufficient time steps
+3. **FFT**: Transform time signals to frequency domain
+4. **Power ratios**: Calculate R, T, A from spectral power
+
+### Numerical Considerations
+
+- **Grid resolution**: Î”l << Î»_min (at least Î»/20)
+- **Time steps**: Sufficient for pulse to traverse domain
+- **Boundary conditions**: Absorbing (PML) to prevent reflections
+
+## 5. Physical Insights
+
+### Effect of Fermi Energy
+
+- Higher E_F â†’ More free carriers â†’ Higher conductivity
+- Higher conductivity â†’ Higher absorption (up to 50%)
+- E_F is tunable via electrostatic gating
+
+### Effect of Relaxation Time
+
+- Longer Ï„ â†’ Sharper spectral features
+- Shorter Ï„ â†’ Broader absorption band
+- Ï„ depends on sample quality and defects
+
+### Frequency Dependence
+
+- Low frequency: High reflection, low transmission
+- High frequency: Low reflection, high transmission
+- Absorption peak near plasma frequency
+
+## References
+
+1. Christopoulos, C. (1995). *The Transmission-Line Modeling Method: TLM*. IEEE Press.
+
+2. Falkovsky, L. A., & Pershoguba, S. S. (2007). Optical far-infrared properties of a graphene monolayer and multilayer. *Physical Review B*, 76(15), 153410.
+
+3. Hanson, G. W. (2008). Dyadic Green's functions and guided surface waves for a surface conductivity model of graphene. *Journal of Applied Physics*, 103(6), 064302.
+
+4. Nair, R. R., et al. (2008). Fine structure constant defines visual transparency of graphene. *Science*, 320(5881), 1308-1308.
+
+5. Bonaccorso, F., et al. (2010). Graphene photonics and optoelectronics. *Nature Photonics*, 4(9), 611-622.
