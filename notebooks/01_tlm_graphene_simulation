@@ -6,7 +6,7 @@
    "source": [
     "# TLM Simulation of Graphene Sheet in THz Range\n",
     "\n",
-    "[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/YOUR_USERNAME/tlm-graphene-thz/blob/main/notebooks/01_tlm_graphene_simulation.ipynb)\n",
+    "[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/blob/main/notebooks/01_tlm_graphene_simulation.ipynb)\n",
     "\n",
     "This notebook demonstrates the Transmission Line Matrix (TLM) simulation for calculating reflection (R), transmission (T), and absorption (A) coefficients of a graphene sheet in the terahertz frequency range.\n",
     "\n",
@@ -41,7 +41,7 @@
     "\n",
     "if IN_COLAB:\n",
     "    # Clone the repository\n",
-    "    !git clone https://github.com/YOUR_USERNAME/tlm-graphene-thz.git\n",
+    "    !git clone https://github.com/Moordrone/tlm-graphene-thz.git\n",
     "    %cd tlm-graphene-thz\n",
     "    \n",
     "    # Install dependencies\n",
