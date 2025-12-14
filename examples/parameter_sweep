@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""
+Parametric Sweep Example
+========================
+
+Sweep over Fermi energy and relaxation time to create
+2D parameter maps of graphene absorption.
+
+Run with: python examples/parameter_sweep.py
+"""
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+import numpy as np
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
+from src.graphene_model import graphene_RTA_analytical
+
+
+def main():
+    print("=" * 50)
+    print("Graphene Parametric Sweep")
+    print("=" * 50)
+    
+    # Parameter ranges
+    E_F_values = np.linspace(0.1, 1.0, 25)      # eV
+    tau_values = np.linspace(10e-15, 500e-15, 25)  # s
+    freq = np.linspace(0.1e12, 10e12, 100)      # Hz
+    
+    print(f"\nSweep parameters:")
+    print(f"  E_F: {E_F_values.min():.2f} - {E_F_values.max():.2f} eV ({len(E_F_values)} points)")
+    print(f"  τ: {tau_values.min()*1e15:.0f} - {tau_values.max()*1e15:.0f} fs ({len(tau_values)} points)")
+    print(f"  Total: {len(E_F_values) * len(tau_values)} simulations")
+    
+    # Storage
+    A_max_map = np.zeros((len(E_F_values), len(tau_values)))
+    f_A_max_map = np.zeros_like(A_max_map)
+    
+    # Run sweep
+    print("\nRunning sweep...")
+    for i, E_F in enumerate(tqdm(E_F_values)):
+        for j, tau in enumerate(tau_values):
+            R, T, A = graphene_RTA_analytical(freq, E_F, tau)
+            A_max_map[i, j] = np.max(A)
+            f_A_max_map[i, j] = freq[np.argmax(A)] / 1e12
+    
+    # Create plots
+    print("\nGenerating plots...")
+    
+    TAU_GRID, EF_GRID = np.meshgrid(tau_values * 1e15, E_F_values)
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    
+    # Maximum absorption map
+    c1 = axes[0].pcolormesh(TAU_GRID, EF_GRID, A_max_map, cmap='hot', shading='auto')
+    axes[0].set_xlabel('Relaxation Time τ (fs)')
+    axes[0].set_ylabel('Fermi Energy E_F (eV)')
+    axes[0].set_title('Maximum Absorption')
+    plt.colorbar(c1, ax=axes[0], label='A_max')
+    
+    # Find and mark optimal point
+    max_idx = np.unravel_index(np.argmax(A_max_map), A_max_map.shape)
+    opt_E_F = E_F_values[max_idx[0]]
+    opt_tau = tau_values[max_idx[1]] * 1e15
+    max_A = A_max_map[max_idx]
+    axes[0].plot(opt_tau, opt_E_F, 'w*', markersize=15)
+    
+    # Frequency of max absorption map
+    c2 = axes[1].pcolormesh(TAU_GRID, EF_GRID, f_A_max_map, cmap='viridis', shading='auto')
+    axes[1].set_xlabel('Relaxation Time τ (fs)')
+    axes[1].set_ylabel('Fermi Energy E_F (eV)')
+    axes[1].set_title('Frequency of Maximum Absorption')
+    plt.colorbar(c2, ax=axes[1], label='f(A_max) [THz]')
+    
+    plt.tight_layout()
+    plt.savefig('parametric_sweep.png', dpi=150)
+    print("  Saved: parametric_sweep.png")
+    
+    # Print optimal parameters
+    print(f"\n🎯 Optimal parameters:")
+    print(f"   E_F = {opt_E_F:.2f} eV")
+    print(f"   τ = {opt_tau:.0f} fs")
+    print(f"   A_max = {max_A:.1%}")
+    
+    plt.show()
+    print("\n✅ Done!")
+
+
+if __name__ == "__main__":
+    main()
