@@ -1,7 +1,7 @@
 # TLM Simulation of Graphene Sheet in THz Range
 
-[![Open In Colab - Main](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/blob/main/notebooks/01_tlm_graphene_simulation.ipynb)
-[![Open In Colab - Parametric](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/blob/main/notebooks/02_parametric_analysis.ipynb)
+[![Open In Colab - Main](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/notebooks/01_tlm_graphene_simulation.ipynb)
+[![Open In Colab - Parametric](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/notebooks/02_parametric_analysis.ipynb)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
@@ -23,9 +23,9 @@ Click the badges above or use these direct links:
 
 | Notebook | Description | Link |
 |----------|-------------|------|
-| Main Simulation | Basic TLM simulation with graphene | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/blob/main/notebooks/01_tlm_graphene_simulation.ipynb) |
-| Parametric Analysis | Study effect of Fermi energy and relaxation time | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/blob/main/notebooks/02_parametric_analysis.ipynb) |
-| Simple Example | Quick demo with minimal code | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/blob/main/notebooks/03_simple_example.ipynb) |
+| Main Simulation | Basic TLM simulation with graphene | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/notebooks/01_tlm_graphene_simulation.ipynb) |
+| Parametric Analysis | Study effect of Fermi energy and relaxation time | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/notebooks/02_parametric_analysis.ipynb) |
+| Simple Example | Quick demo with minimal code | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Moordrone/tlm-graphene-thz/notebooks/03_simple_example.ipynb) |
 
 ### Option 2: Local Installation
 
