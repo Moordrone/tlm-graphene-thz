@@ -1,0 +1,34 @@
+"""
+TLM Graphene Simulation Package
+================================
+
+Transmission Line Matrix (TLM) simulation for graphene sheets
+in the terahertz frequency range (0-10 THz).
+
+Modules:
+    - tlm_core: Core TLM functions (init, scatter, connect, boundary)
+    - graphene_model: Drude model for graphene conductivity
+    - simulation: Main simulation class
+    - visualization: Plotting utilities
+
+Example:
+    >>> from src.simulation import GrapheneTLMSimulation
+    >>> sim = GrapheneTLMSimulation(fermi_energy=0.4, relaxation_time=100e-15)
+    >>> results = sim.run()
+    >>> sim.plot_coefficients()
+"""
+
+from .tlm_core import TLMGrid1D
+from .graphene_model import GrapheneDrude
+from .simulation import GrapheneTLMSimulation
+from .visualization import plot_RTA, plot_parametric_map
+
+__version__ = "1.0.0"
+__author__ = "Your Name"
+__all__ = [
+    "TLMGrid1D",
+    "GrapheneDrude", 
+    "GrapheneTLMSimulation",
+    "plot_RTA",
+    "plot_parametric_map"
+]
