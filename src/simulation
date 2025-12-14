@@ -1,0 +1,436 @@
+"""
+Graphene TLM Simulation
+=======================
+
+Main simulation class combining TLM method with graphene Drude model
+for calculating R, T, A coefficients in the terahertz range.
+
+This module provides a high-level interface for running simulations
+with minimal configuration.
+"""
+
+import numpy as np
+from typing import Optional, Tuple, Dict
+from dataclasses import dataclass, field
+
+from .graphene_model import GrapheneDrude, graphene_RTA_analytical
+from .tlm_core import TLMGrid1D
+
+
+@dataclass
+class SimulationResults:
+    """Container for simulation results."""
+    frequency: np.ndarray          # Frequency array [Hz]
+    frequency_THz: np.ndarray      # Frequency array [THz]
+    R: np.ndarray                  # Reflection coefficient
+    T: np.ndarray                  # Transmission coefficient
+    A: np.ndarray                  # Absorption coefficient
+    
+    # Graphene parameters
+    fermi_energy: float = 0.0      # Fermi energy [eV]
+    relaxation_time: float = 0.0   # Relaxation time [s]
+    
+    # Derived quantities
+    sigma: np.ndarray = field(default_factory=lambda: np.array([]))
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        return {
+            'frequency_Hz': self.frequency,
+            'frequency_THz': self.frequency_THz,
+            'R': self.R,
+            'T': self.T,
+            'A': self.A,
+            'fermi_energy_eV': self.fermi_energy,
+            'relaxation_time_s': self.relaxation_time
+        }
+    
+    def save_csv(self, filename: str):
+        """Save results to CSV file."""
+        import csv
+        with open(filename, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Frequency_THz', 'R', 'T', 'A'])
+            for i in range(len(self.frequency)):
+                writer.writerow([
+                    self.frequency_THz[i],
+                    self.R[i],
+                    self.T[i],
+                    self.A[i]
+                ])
+    
+    def max_absorption(self) -> Tuple[float, float]:
+        """Return maximum absorption and corresponding frequency."""
+        idx = np.argmax(self.A)
+        return self.A[idx], self.frequency_THz[idx]
+    
+    def verify_energy_conservation(self, tolerance: float = 0.01) -> bool:
+        """Check if R + T + A ≈ 1."""
+        total = self.R + self.T + self.A
+        return np.all(np.abs(total - 1.0) < tolerance)
+
+
+class GrapheneTLMSimulation:
+    """
+    High-level TLM simulation for graphene in THz range.
+    
+    This class provides an easy interface to simulate electromagnetic
+    wave interaction with graphene sheets using the TLM method.
+    
+    Parameters
+    ----------
+    freq_range : tuple
+        (f_min, f_max) in Hz
+    n_freq : int
+        Number of frequency points
+    fermi_energy : float
+        Graphene Fermi energy in eV
+    relaxation_time : float
+        Carrier relaxation time in seconds
+    method : str
+        'analytical' or 'tlm' (analytical is much faster)
+    
+    Examples
+    --------
+    >>> sim = GrapheneTLMSimulation(
+    ...     freq_range=(0.1e12, 10e12),
+    ...     fermi_energy=0.4,
+    ...     relaxation_time=100e-15
+    ... )
+    >>> results = sim.run()
+    >>> print(f"Max absorption: {results.max_absorption()}")
+    >>> sim.plot_coefficients()
+    """
+    
+    def __init__(self,
+                 freq_range: Tuple[float, float] = (0.1e12, 10e12),
+                 n_freq: int = 200,
+                 fermi_energy: float = 0.4,
+                 relaxation_time: float = 100e-15,
+                 method: str = 'analytical'):
+        """
+        Initialize simulation.
+        
+        Parameters
+        ----------
+        freq_range : tuple
+            (f_min, f_max) in Hz, default (0.1, 10) THz
+        n_freq : int
+            Number of frequency points
+        fermi_energy : float
+            Fermi energy in eV
+        relaxation_time : float
+            Relaxation time in seconds
+        method : str
+            'analytical' (fast) or 'tlm' (full time-domain)
+        """
+        self.freq_min, self.freq_max = freq_range
+        self.n_freq = n_freq
+        self.fermi_energy = fermi_energy
+        self.relaxation_time = relaxation_time
+        self.method = method
+        
+        # Create frequency array
+        self.frequency = np.linspace(self.freq_min, self.freq_max, n_freq)
+        
+        # Create graphene model
+        self.graphene = GrapheneDrude(fermi_energy, relaxation_time)
+        
+        # Results placeholder
+        self.results: Optional[SimulationResults] = None
+    
+    def run(self, verbose: bool = True) -> SimulationResults:
+        """
+        Run the simulation.
+        
+        Parameters
+        ----------
+        verbose : bool
+            Print progress information
+        
+        Returns
+        -------
+        results : SimulationResults
+            Simulation results object
+        """
+        if verbose:
+            print(f"Running graphene TLM simulation...")
+            print(f"  Fermi energy: {self.fermi_energy} eV")
+            print(f"  Relaxation time: {self.relaxation_time*1e15:.1f} fs")
+            print(f"  Frequency range: {self.freq_min/1e12:.1f} - {self.freq_max/1e12:.1f} THz")
+            print(f"  Method: {self.method}")
+        
+        if self.method == 'analytical':
+            R, T, A = self._run_analytical()
+        else:
+            R, T, A = self._run_tlm()
+        
+        # Calculate conductivity spectrum
+        sigma = self.graphene.conductivity(self.frequency)
+        
+        # Create results object
+        self.results = SimulationResults(
+            frequency=self.frequency,
+            frequency_THz=self.frequency / 1e12,
+            R=R,
+            T=T,
+            A=A,
+            fermi_energy=self.fermi_energy,
+            relaxation_time=self.relaxation_time,
+            sigma=sigma
+        )
+        
+        if verbose:
+            A_max, f_max = self.results.max_absorption()
+            print(f"  Max absorption: {A_max:.1%} at {f_max:.2f} THz")
+            print(f"  Energy conservation: {'OK' if self.results.verify_energy_conservation() else 'WARNING'}")
+        
+        return self.results
+    
+    def _run_analytical(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Run analytical calculation."""
+        return graphene_RTA_analytical(
+            self.frequency,
+            self.fermi_energy,
+            self.relaxation_time
+        )
+    
+    def _run_tlm(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Run full TLM time-domain simulation."""
+        from .tlm_core import tlm_frequency_response
+        
+        return tlm_frequency_response(
+            n_cells=1000,
+            graphene_sigma_func=self.graphene.conductivity,
+            frequencies=self.frequency
+        )
+    
+    def plot_coefficients(self, figsize: Tuple[int, int] = (12, 5),
+                          save_path: Optional[str] = None):
+        """
+        Plot R, T, A coefficients.
+        
+        Parameters
+        ----------
+        figsize : tuple
+            Figure size
+        save_path : str, optional
+            Path to save figure
+        """
+        import matplotlib.pyplot as plt
+        
+        if self.results is None:
+            raise ValueError("Run simulation first with .run()")
+        
+        fig, axes = plt.subplots(1, 3, figsize=figsize)
+        freq = self.results.frequency_THz
+        
+        # Reflection
+        axes[0].plot(freq, self.results.R, 'b-', linewidth=2)
+        axes[0].fill_between(freq, 0, self.results.R, alpha=0.3)
+        axes[0].set_xlabel('Frequency (THz)')
+        axes[0].set_ylabel('Reflection R')
+        axes[0].set_title('Reflection Coefficient')
+        axes[0].set_xlim(freq[0], freq[-1])
+        axes[0].set_ylim(0, 1)
+        axes[0].grid(True, alpha=0.3)
+        
+        # Transmission
+        axes[1].plot(freq, self.results.T, 'g-', linewidth=2)
+        axes[1].fill_between(freq, 0, self.results.T, alpha=0.3, color='green')
+        axes[1].set_xlabel('Frequency (THz)')
+        axes[1].set_ylabel('Transmission T')
+        axes[1].set_title('Transmission Coefficient')
+        axes[1].set_xlim(freq[0], freq[-1])
+        axes[1].set_ylim(0, 1)
+        axes[1].grid(True, alpha=0.3)
+        
+        # Absorption
+        axes[2].plot(freq, self.results.A, 'r-', linewidth=2)
+        axes[2].fill_between(freq, 0, self.results.A, alpha=0.3, color='red')
+        axes[2].set_xlabel('Frequency (THz)')
+        axes[2].set_ylabel('Absorption A')
+        axes[2].set_title('Absorption Coefficient')
+        axes[2].set_xlim(freq[0], freq[-1])
+        axes[2].set_ylim(0, 1)
+        axes[2].grid(True, alpha=0.3)
+        
+        # Add parameter annotation
+        A_max, f_max = self.results.max_absorption()
+        axes[2].annotate(f'Max: {A_max:.1%} @ {f_max:.2f} THz',
+                        xy=(f_max, A_max),
+                        xytext=(f_max + 1, A_max + 0.1),
+                        arrowprops=dict(arrowstyle='->', color='red'),
+                        fontsize=10)
+        
+        fig.suptitle(f'Graphene TLM: E_F = {self.fermi_energy} eV, '
+                    f'τ = {self.relaxation_time*1e15:.0f} fs',
+                    fontsize=12)
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
+            print(f"Figure saved to {save_path}")
+        
+        plt.show()
+        
+        return fig, axes
+    
+    def plot_all_in_one(self, figsize: Tuple[int, int] = (8, 6),
+                        save_path: Optional[str] = None):
+        """
+        Plot R, T, A on single axes.
+        
+        Parameters
+        ----------
+        figsize : tuple
+            Figure size
+        save_path : str, optional
+            Path to save figure
+        """
+        import matplotlib.pyplot as plt
+        
+        if self.results is None:
+            raise ValueError("Run simulation first with .run()")
+        
+        fig, ax = plt.subplots(figsize=figsize)
+        freq = self.results.frequency_THz
+        
+        ax.plot(freq, self.results.R, 'b-', linewidth=2, label='Reflection R')
+        ax.plot(freq, self.results.T, 'g-', linewidth=2, label='Transmission T')
+        ax.plot(freq, self.results.A, 'r-', linewidth=2, label='Absorption A')
+        ax.plot(freq, self.results.R + self.results.T + self.results.A, 
+               'k--', linewidth=1, alpha=0.5, label='R+T+A')
+        
+        ax.set_xlabel('Frequency (THz)', fontsize=12)
+        ax.set_ylabel('Coefficient', fontsize=12)
+        ax.set_title(f'Graphene R, T, A Coefficients\n'
+                    f'E_F = {self.fermi_energy} eV, τ = {self.relaxation_time*1e15:.0f} fs',
+                    fontsize=12)
+        ax.set_xlim(freq[0], freq[-1])
+        ax.set_ylim(0, 1.05)
+        ax.legend(loc='best')
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        
+        plt.show()
+        
+        return fig, ax
+    
+    def plot_conductivity(self, figsize: Tuple[int, int] = (10, 4)):
+        """Plot graphene conductivity spectrum."""
+        import matplotlib.pyplot as plt
+        
+        if self.results is None:
+            self.run(verbose=False)
+        
+        fig, axes = plt.subplots(1, 2, figsize=figsize)
+        freq = self.results.frequency_THz
+        
+        # Real part
+        axes[0].plot(freq, np.real(self.results.sigma) * 1e3, 'b-', linewidth=2)
+        axes[0].set_xlabel('Frequency (THz)')
+        axes[0].set_ylabel('Re(σ) (mS)')
+        axes[0].set_title('Real Conductivity')
+        axes[0].grid(True, alpha=0.3)
+        
+        # Imaginary part
+        axes[1].plot(freq, np.imag(self.results.sigma) * 1e3, 'r-', linewidth=2)
+        axes[1].set_xlabel('Frequency (THz)')
+        axes[1].set_ylabel('Im(σ) (mS)')
+        axes[1].set_title('Imaginary Conductivity')
+        axes[1].grid(True, alpha=0.3)
+        
+        fig.suptitle(f'Graphene Drude Conductivity (E_F = {self.fermi_energy} eV)')
+        plt.tight_layout()
+        plt.show()
+        
+        return fig, axes
+
+
+def parametric_study(fermi_energies: np.ndarray,
+                     relaxation_times: np.ndarray,
+                     freq_range: Tuple[float, float] = (0.1e12, 10e12),
+                     n_freq: int = 100,
+                     verbose: bool = True) -> Dict:
+    """
+    Run parametric study over Fermi energy and relaxation time.
+    
+    Parameters
+    ----------
+    fermi_energies : array
+        Array of Fermi energies in eV
+    relaxation_times : array
+        Array of relaxation times in seconds
+    freq_range : tuple
+        Frequency range in Hz
+    n_freq : int
+        Number of frequency points
+    verbose : bool
+        Show progress
+    
+    Returns
+    -------
+    results : dict
+        Dictionary with 2D arrays of R, T, A at each parameter combination
+    """
+    n_ef = len(fermi_energies)
+    n_tau = len(relaxation_times)
+    
+    frequency = np.linspace(freq_range[0], freq_range[1], n_freq)
+    
+    # Storage arrays
+    R_map = np.zeros((n_ef, n_tau, n_freq))
+    T_map = np.zeros((n_ef, n_tau, n_freq))
+    A_map = np.zeros((n_ef, n_tau, n_freq))
+    A_max = np.zeros((n_ef, n_tau))
+    f_A_max = np.zeros((n_ef, n_tau))
+    
+    total_runs = n_ef * n_tau
+    run_count = 0
+    
+    for i, ef in enumerate(fermi_energies):
+        for j, tau in enumerate(relaxation_times):
+            R, T, A = graphene_RTA_analytical(frequency, ef, tau)
+            
+            R_map[i, j, :] = R
+            T_map[i, j, :] = T
+            A_map[i, j, :] = A
+            
+            A_max[i, j] = np.max(A)
+            f_A_max[i, j] = frequency[np.argmax(A)] / 1e12
+            
+            run_count += 1
+            if verbose and run_count % 10 == 0:
+                print(f"Progress: {run_count}/{total_runs}")
+    
+    return {
+        'fermi_energies': fermi_energies,
+        'relaxation_times': relaxation_times,
+        'frequency': frequency,
+        'frequency_THz': frequency / 1e12,
+        'R': R_map,
+        'T': T_map,
+        'A': A_map,
+        'A_max': A_max,
+        'f_A_max': f_A_max
+    }
+
+
+if __name__ == "__main__":
+    # Demo simulation
+    sim = GrapheneTLMSimulation(
+        freq_range=(0.1e12, 10e12),
+        n_freq=200,
+        fermi_energy=0.4,
+        relaxation_time=100e-15
+    )
+    
+    results = sim.run()
+    sim.plot_coefficients()
+    sim.plot_all_in_one()
